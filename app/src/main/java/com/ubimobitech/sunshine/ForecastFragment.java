@@ -1,5 +1,7 @@
 package com.ubimobitech.sunshine;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,6 +13,7 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -21,9 +24,10 @@ import android.widget.AdapterView;
 import android.widget.CursorAdapter;
 import android.widget.ListView;
 
-import ubimobitech.com.sunshine.adapter.ForecastAdapter;
-import ubimobitech.com.sunshine.data.WeatherContract;
-import ubimobitech.com.sunshine.utils.Utils;
+import com.ubimobitech.sunshine.adapter.ForecastAdapter;
+import com.ubimobitech.sunshine.data.WeatherContract;
+import com.ubimobitech.sunshine.sync.SunshineSyncAdapter;
+import com.ubimobitech.sunshine.utils.Utils;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -33,6 +37,11 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     private static final int FORECAST_LOADER = 0;
     private ListView mListView;
     private ForecastAdapter mForecastAdapter;
+    private String mLocationSetting;
+    private boolean mUseTodayLayout;
+
+    private static final String LIST_POSITION = "list_position";
+    private int mSelectedItem = 0;
 
     private static final String[] FORECAST_COLUMNS = {
             // In this case the id needs to be fully qualified with a table name, since
@@ -64,7 +73,23 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     public static final int COL_COORD_LAT = 7;
     public static final int COL_COORD_LONG = 8;
 
+    private AlarmManager mAlarmMgr;
+    private PendingIntent mAlarmIntent;
+
+    /**
+     * A callback interface that all activities containing this fragment must
+     * implement. This mechanism allows activities to be notified of item
+     * selections.
+     */
+    public interface Callback {
+        /**
+         * DetailFragmentCallback for when an item has been selected.
+         * */
+        void onItemSelected(Uri dateUri);
+    }
+
     public ForecastFragment() {
+
     }
 
     @Override
@@ -76,12 +101,16 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
 
         mListView = (ListView) view.findViewById(R.id.listview_forecast);
 
-        String locationSetting = Utils.getPreferredLocation(getActivity());
+        mLocationSetting = Utils.getPreferredLocation(getActivity());
+
+        if (savedInstanceState != null) {
+            mSelectedItem = savedInstanceState.getInt(LIST_POSITION);
+        }
 
         // Sort order:  Ascending, by date.
         String sortOrder = WeatherContract.WeatherEntry.COLUMN_DATE + " ASC";
         Uri weatherForLocationUri = WeatherContract.WeatherEntry.buildWeatherLocationWithStartDate(
-                locationSetting, System.currentTimeMillis());
+                mLocationSetting, System.currentTimeMillis());
 
         Cursor cur = getActivity().getContentResolver().query(weatherForLocationUri,
                 null, null, null, sortOrder);
@@ -96,13 +125,13 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
                 // CursorAdapter returns a cursor at the correct position for getItem(), or null
                 // if it cannot seek to that position.
                 Cursor cursor = (Cursor) adapterView.getItemAtPosition(position);
+                mSelectedItem = position;
+
                 if (cursor != null) {
-                    String locationSetting = Utils.getPreferredLocation(getActivity());
-                    Intent intent = new Intent(getActivity(), DetailActivity.class)
-                            .setData(WeatherContract.WeatherEntry.buildWeatherLocationWithDate(
-                                    locationSetting, cursor.getLong(COL_WEATHER_DATE)
-                            ));
-                    startActivity(intent);
+                    ((Callback) getActivity()).onItemSelected(WeatherContract
+                            .WeatherEntry.buildWeatherLocationWithDate(
+                            mLocationSetting, cursor.getLong(COL_WEATHER_DATE)
+                    ));
                 }
             }
         });
@@ -118,11 +147,7 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     }
 
     private void updateWeather() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-
-        FetchWeatherTask weatherTask = new FetchWeatherTask(getActivity());
-        weatherTask.execute(prefs.getString(getString(R.string.pref_location_key),
-                getString(R.string.pref_location_default)));
+        SunshineSyncAdapter.syncImmediately(getActivity());
     }
 
     /**
@@ -164,27 +189,39 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
         int id = item.getItemId();
 
         switch(id) {
-            case R.id.action_refresh:
-                updateWeather();
-                return true;
             case R.id.action_location:
-                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-                String location = prefs.getString(getString(R.string.pref_location_key),
-                        getString(R.string.pref_location_default));
-
-                final String GEO = "geo:0,0?";
-                final String QUERY_PARAM = "q";
-
-                Uri builtUri = Uri.parse(GEO).buildUpon()
-                        .appendQueryParameter(QUERY_PARAM, location).build();
-
-                showMap(builtUri);
+                openPreferredLocationInMap();
 
                 return true;
 
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void openPreferredLocationInMap() {
+        // Using the URI scheme for showing a location found on a map.  This super-handy
+        // intent can is detailed in the "Common Intents" page of Android's developer site:
+        // http://developer.android.com/guide/components/intents-common.html#Maps
+        if ( null != mForecastAdapter ) {
+            Cursor c = mForecastAdapter.getCursor();
+            if ( null != c ) {
+                c.moveToPosition(0);
+                String posLat = c.getString(COL_COORD_LAT);
+                String posLong = c.getString(COL_COORD_LONG);
+                Uri geoLocation = Uri.parse("geo:" + posLat + "," + posLong);
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(geoLocation);
+
+                if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+                    startActivity(intent);
+                } else {
+                    Log.d(TAG, "Couldn't call " + geoLocation.toString() + ", no receiving apps installed!");
+                }
+            }
+
+        }
     }
 
     public void showMap(Uri geoLocation) {
@@ -195,6 +232,31 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
         }
     }
 
+    /**
+     * Called to ask the fragment to save its current dynamic state, so it
+     * can later be reconstructed in a new instance of its process is
+     * restarted.  If a new instance of the fragment later needs to be
+     * created, the data you place in the Bundle here will be available
+     * in the Bundle given to {@link #onCreate(Bundle)},
+     * {@link #onCreateView(LayoutInflater, ViewGroup, Bundle)}, and
+     * {@link #onActivityCreated(Bundle)}.
+     * <p/>
+     * <p>This corresponds to {@link Fragment#onSaveInstanceState(Bundle)
+     * Activity.onSaveInstanceState(Bundle)} and most of the discussion there
+     * applies here as well.  Note however: <em>this method may be called
+     * at any time before {@link #onDestroy()}</em>.  There are many situations
+     * where a fragment may be mostly torn down (such as when placed on the
+     * back stack with no UI showing), but its state will not be saved until
+     * its owning activity actually needs to save its state.
+     *
+     * @param outState Bundle in which to place your saved state.
+     */
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putInt(LIST_POSITION, mSelectedItem);
+
+        super.onSaveInstanceState(outState);
+    }
 
     /**
      * Instantiate and return a new Loader for the given ID.
@@ -256,6 +318,8 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
         mForecastAdapter.swapCursor(cursor);
+
+        mListView.smoothScrollToPosition(mSelectedItem);
     }
 
     /**
@@ -268,5 +332,12 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
         mForecastAdapter.swapCursor(null);
+    }
+
+    public void setUseTodayLayout(boolean useTodayLayout) {
+        mUseTodayLayout = useTodayLayout;
+        if (mForecastAdapter != null) {
+            mForecastAdapter.setUseTodayLayout(mUseTodayLayout);
+        }
     }
 }

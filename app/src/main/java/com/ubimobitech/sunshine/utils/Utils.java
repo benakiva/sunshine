@@ -45,11 +45,11 @@ public class Utils {
                 .equals(context.getString(R.string.pref_temperature_units_default));
     }
 
-    public static String formatTemperature(Context context, double temperature, boolean isMetric) {
+    public static String formatTemperature(Context context, double temperature) {
         double temp;
 
-        if ( !isMetric ) {
-            temp = 9*temperature/5+32;
+        if ( !isMetric(context) ) {
+            temp = (temperature * 1.8) + 32;
         } else {
             temp = temperature;
         }

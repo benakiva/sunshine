@@ -19,8 +19,8 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
-import ubimobitech.com.sunshine.data.WeatherContract.LocationEntry;
-import ubimobitech.com.sunshine.data.WeatherContract.WeatherEntry;
+import com.ubimobitech.sunshine.data.WeatherContract.LocationEntry;
+import com.ubimobitech.sunshine.data.WeatherContract.WeatherEntry;
 
 /**
  * Manages a local database for weather data.
