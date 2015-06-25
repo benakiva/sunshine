@@ -4,11 +4,9 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
@@ -72,9 +70,6 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     public static final int COL_LOCATION_SETTING = 6;
     public static final int COL_COORD_LAT = 7;
     public static final int COL_COORD_LONG = 8;
-
-    private AlarmManager mAlarmMgr;
-    private PendingIntent mAlarmIntent;
 
     /**
      * A callback interface that all activities containing this fragment must
