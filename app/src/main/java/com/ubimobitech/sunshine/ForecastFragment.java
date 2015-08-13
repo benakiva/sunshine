@@ -5,6 +5,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -12,20 +14,26 @@ import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.CursorAdapter;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.TextView;
 
 import com.ubimobitech.sunshine.adapter.ForecastAdapter;
 import com.ubimobitech.sunshine.data.WeatherContract;
 import com.ubimobitech.sunshine.sync.SunshineSyncAdapter;
 import com.ubimobitech.sunshine.utils.Utils;
+
+import org.w3c.dom.Text;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -37,6 +45,7 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     private ForecastAdapter mForecastAdapter;
     private String mLocationSetting;
     private boolean mUseTodayLayout;
+    private TextView mEmptyMsg;
 
     private static final String LIST_POSITION = "list_position";
     private int mSelectedItem = 0;
@@ -95,6 +104,10 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
         View view = inflater.inflate(R.layout.fragment_main, container, false);
 
         mListView = (ListView) view.findViewById(R.id.listview_forecast);
+
+        mEmptyMsg = (TextView)view.findViewById(R.id.listview_forecast_empty);
+        mEmptyMsg.setText(R.string.no_weather_data_available);
+        mListView.setEmptyView(mEmptyMsg);
 
         mLocationSetting = Utils.getPreferredLocation(getActivity());
 
@@ -312,7 +325,18 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
      */
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
-        mForecastAdapter.swapCursor(cursor);
+        if (cursor == null) {
+
+
+            if (!Utils.isNetworkAvailable(getActivity())) {
+                StringBuilder builder = new StringBuilder(
+                        getString(R.string.no_weather_data_available));
+               // builder.append();
+                mEmptyMsg.setText(getString(R.string.no_network));
+            }
+        }
+            mForecastAdapter.swapCursor(cursor);
+
 
         mListView.smoothScrollToPosition(mSelectedItem);
     }

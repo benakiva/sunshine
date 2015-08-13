@@ -68,4 +68,6 @@
 
     <string name="pref_notif_title">Notification</string>
     <string name="pref_notif_summ">Enables/disables notification</string>
+    <string name="no_weather_data_available">No Weather Information Available.</string>
+    <string name="no_network">The network is not available to fetch weather data.</string>
 </resources>

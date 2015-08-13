@@ -9,6 +9,8 @@ package com.ubimobitech.sunshine.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.preference.PreferenceManager;
 import android.text.format.Time;
 
@@ -257,5 +259,14 @@ public class Utils {
         }
 
         return -1;
+    }
+
+    public static boolean isNetworkAvailable(Context context) {
+        ConnectivityManager connectivityManager = (ConnectivityManager)context
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        NetworkInfo netInfo = connectivityManager.getActiveNetworkInfo();
+
+        return netInfo != null && netInfo.isConnectedOrConnecting();
     }
 }
